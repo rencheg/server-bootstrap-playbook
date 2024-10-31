@@ -1,0 +1,16 @@
+- name: Encrypt and open selected encrypted block device
+  block:
+    - name: Check if the disk is already encrypted
+      command: cryptsetup isLuks /dev/{{ block_device }}
+      register: luks_check
+      ignore_errors: true
+      become: true
+
+    - name: Encrypting the selected disk
+      shell: echo "{{ encryption_passphrase }}" | cryptsetup -q luksFormat /dev/{{ block_device }}
+      become: true
+      when: luks_check.rc != 0
+
+    - name: Opening the encrypted disk
+      shell: echo "{{ encryption_passphrase }}" | cryptsetup open /dev/{{ block_device }} {{ encrypted_partition_label }}
+      become: true

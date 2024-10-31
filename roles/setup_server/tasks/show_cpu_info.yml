@@ -1,0 +1,19 @@
+- name: Display list of CPUs and hyperthreading information
+  shell: |
+    lscpu | grep -E "^CPU\\(s\\):|Thread\\(s\\) per core"
+  register: cpu_info
+  changed_when: false
+
+- name: Parse CPU count
+  set_fact:
+    cpu_count: "{{ (cpu_info.stdout | regex_search('^CPU\\(s\\):\\s+(\\d+)', '\\1', multiline=True)) }}"
+
+- name: Parse hyperthreading info
+  set_fact:
+    threads_per_core: "{{ (cpu_info.stdout | regex_search('Thread\\(s\\) per core:\\s+(\\d+)', '\\1', multiline=True)) }}"
+
+- name: Show formatted CPU and hyperthreading details
+  debug:
+    msg:
+      - "CPUs: {{ cpu_count }}"
+      - "Threads per core: {{ threads_per_core }}"

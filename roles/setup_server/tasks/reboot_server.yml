@@ -1,0 +1,6 @@
+
+- name: Reboot the server if reboot is needed
+  reboot:
+    msg: "Rebooting server"
+    reboot_timeout: 300
+  when: reboot_needed | default(false)

@@ -1,0 +1,9 @@
+---
+- include_tasks: install_packages.yml
+- include_tasks: encrypt_second_disk.yml
+- include_tasks: encrypt_empty_partition.yml
+- include_tasks: disable_c_states.yml
+- include_tasks: switch_cpu_mode.yml
+- include_tasks: rename_interface.yml
+- include_tasks: reboot_server.yml
+- include_tasks: show_cpu_info.yml

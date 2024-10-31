@@ -1,0 +1,7 @@
+# playbook used on new bootstrapped servers
+---
+- name: Prepare new server for operations
+  hosts: bootstrap
+  become: true
+  roles:
+    - setup_server

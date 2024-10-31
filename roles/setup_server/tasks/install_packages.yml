@@ -1,0 +1,9 @@
+# Task is designed for centralized bulk packages installation on role
+---
+- name: Install multiple packages on host
+  apt:
+    name:
+      - cryptsetup
+      - linux-tools-common
+    state: present
+  become: true

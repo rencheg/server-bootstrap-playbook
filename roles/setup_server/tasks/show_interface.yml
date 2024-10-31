@@ -1,0 +1,32 @@
+- name: Get network interface details
+  command: ip a show {{ interface_name }}
+  register: interface_output
+
+- name: Initialize interface information
+  set_fact:
+    interface_info:
+      name: "{{ interface_name }}"
+      status: ""
+      ip: ""
+      mac: ""
+
+- name: Parse interface status
+  set_fact:
+    interface_info:
+      name: "{{ interface_name }}"
+      status: "{{ (interface_output.stdout | regex_search('state (\\S+)')) | default('') }}"
+  when: interface_output.stdout | regex_search('state')
+
+- name: Parse interface IP
+  set_fact:
+    interface_info: "{{ interface_info | combine({'ip': (interface_output.stdout | regex_search('\\binet\\s(\\S+)')) | default('') }) }}"
+  when: interface_output.stdout | regex_search('inet ')
+
+- name: Parse MAC address
+  set_fact:
+    interface_info: "{{ interface_info | combine({'mac': (interface_output.stdout | regex_search('link/ether (\\S+)')) | default('') }) }}"
+  when: interface_output.stdout | regex_search('link/ether')
+
+- name: Display network interface information
+  debug:
+    msg: "Interface: {{ interface_info.name }}, Status: {{ interface_info.status }}, IP Address: {{ interface_info.ip }}, MAC Address: {{ interface_info.mac }}"

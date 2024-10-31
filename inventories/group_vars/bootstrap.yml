@@ -1,0 +1,7 @@
+# Variables for bootstrap hosts group
+ansible_user: ubuntu
+ansible_become: yes
+ansible_become_method: sudo
+encrypted_empty_partition_label: data
+encrypted_empty_disk_label: storage
+reboot_needed: false

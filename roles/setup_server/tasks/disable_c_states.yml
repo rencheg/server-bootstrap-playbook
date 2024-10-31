@@ -1,0 +1,43 @@
+- name: Gather CPU facts
+  setup:
+    filter: "processor_vcpus"
+
+- name: Check current GRUB configuration
+  command: grep -E "^GRUB_CMDLINE_LINUX" /etc/default/grub
+  register: grub_config
+
+- name: Get CPU vendor
+  command: lscpu
+  register: cpu_info
+
+- name: Set CPU vendor fact
+  set_fact:
+    cpu_vendor: "{{ cpu_info.stdout | regex_search('Vendor ID:\\s+(\\S+)', '\\1') | first }}"
+
+- name: Update GRUB configuration for Intel CPUs
+  lineinfile:
+    path: /etc/default/grub
+    regexp: '^GRUB_CMDLINE_LINUX='
+    line: 'GRUB_CMDLINE_LINUX="intel_idle.max_cstate=0 processor.max_cstate=0"'
+  register: intel_update
+  when: cpu_vendor == "GenuineIntel" and "'intel_idle.max_cstate=0' not in grub_config.stdout"
+
+- name: Update GRUB configuration for AMD CPUs
+  lineinfile:
+    path: /etc/default/grub
+    regexp: '^GRUB_CMDLINE_LINUX='
+    line: 'GRUB_CMDLINE_LINUX="processor.max_cstate=0"'
+  register: amd_update
+  when: cpu_vendor == "AuthenticAMD" and "'processor.max_cstate=0' not in grub_config.stdout"
+
+- name: Set fact to determine if grub needs updating
+  set_fact:
+    grub_needs_update: "{{ intel_update.changed or amd_update.changed }}"
+
+- name: Update GRUB configuration
+  command: update-grub
+  when: grub_needs_update
+
+- name: Set reboot needed fact
+  set_fact:
+    reboot_needed: "{{ intel_update.changed or amd_update.changed }}"

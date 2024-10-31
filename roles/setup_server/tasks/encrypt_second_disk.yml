@@ -1,0 +1,41 @@
+# Task implements encryption of second block device (which doesn't contains root partition) 
+---
+- name: Find all block devices with 'disk' type except device containing root partition
+  shell: |
+    lsblk -dno NAME,TYPE | awk '$2 == "disk" {print $1}' | grep -v $(lsblk -no pkname $(df / | tail -1 | awk '{print $1}'))
+  register: all_disks
+  changed_when: false
+  become: true
+
+- name: Check the presence of the second disk on the host
+  fail:
+    msg: "Second disk is absent. Please verify that server has more than one disk"
+  when: all_disks.stdout_lines | length == 0
+
+- name: Select second disk
+  set_fact:
+    second_disk: "{{ all_disks.stdout_lines[0] }}"
+
+- name: Encrypt selected disk if it is empty
+  block:
+    - name: Check current partitions on the selected disk
+      shell: "lsblk -n -o NAME /dev/{{ second_disk }} | grep -v {{ second_disk }}"
+      register: disk_partitions
+      changed_when: false
+      failed_when: false
+      become: true
+
+    - name: Check that selected disk is empty
+      fail:
+        msg: "Disk /dev/{{ second_disk }} has partitions. Encryption cannot be done."
+      when: disk_partitions.stdout != ""
+
+    - name: Run encryption tasks on selected partition
+      include_tasks: encrypt_block_device.yml
+      vars:
+        block_device: "{{ second_disk }}"
+        encrypted_partition_label: "{{ encrypted_empty_disk_label }}"
+
+  rescue:
+    - debug:
+        msg: "Encryption skipped because the selected disk has existing partitions."

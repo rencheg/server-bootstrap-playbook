@@ -1,0 +1,61 @@
+---
+- name: Get block device with root partiotion
+  command: lsblk -n -o NAME,MOUNTPOINT
+  register: lsblk_output
+
+- name: Set root device fact
+  set_fact:
+    root_device_raw: "{{ item.split()[0] }}"
+  loop: "{{ lsblk_output.stdout_lines }}"
+  when: item.split() | length > 1 and item.split()[1] == '/'
+
+- name: Normalize root block device name
+  set_fact:
+    root_device: "{{ root_device_raw | regex_replace('^├─|^└─|\\s+', '') | regex_replace('\\d+$', '') }}"
+
+- name: List all partitions on root device
+  command: lsblk -n -o NAME,TYPE,MOUNTPOINT,PARTTYPE /dev/{{ root_device }}
+  register: partitions_output
+
+- name: Get list of non-system partiotions on root device
+  set_fact:
+    filtered_partitions: >-
+      {{
+        partitions_output.stdout_lines
+        | select('search', '0fc63daf-8483-4772-8e79-3d69d8477de4')
+        | reject('search', '/')
+        | map('regex_replace', '^(├─|└─|\\s+)', '')
+        | map('regex_replace', '0fc63daf-8483-4772-8e79-3d69d8477de4', '')
+        | map('regex_replace', 'part', '')
+        | map('regex_replace', '[^A-Za-z0-9]', '')
+        | list
+      }}
+
+- name: Try to find and encrypt partition
+  block:
+    - name: Get the first partition in the list
+      set_fact:
+        first_partition: "{{ filtered_partitions[0] }}"
+
+    - name: Check if the partition is empty
+      command: "lsblk -n -o FSTYPE /dev/{{ first_partition }}"
+      register: fs_check
+
+    - name: Run encryption tasks on selected partition
+      include_tasks: encrypt_block_device.yml
+      vars:
+        block_device: "{{ first_partition }}"
+        encrypted_partition_label: "{{ encrypted_empty_partition_label }}"
+      when: fs_check.stdout == ""
+
+    - name: Print message if the partition is not empty
+      debug:
+        msg: "The partition /dev/{{ first_partition }} is not empty."
+      when: fs_check.stdout != ""
+
+  when: filtered_partitions | length > 0
+
+- name: Print message if no empty partitions found
+  debug:
+    msg: "There is no empty partitions on root device."
+  when: filtered_partitions | length == 0

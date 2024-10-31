@@ -1,0 +1,28 @@
+- name: Check available governors using cpupower
+  command: cpupower frequency-info
+  register: cpupower_info
+  changed_when: false
+
+- name: Check if cpufreq driver is active
+  command: ls /sys/devices/system/cpu/cpu*/cpufreq/
+  register: cpufreq_dir_check
+  changed_when: false
+  ignore_errors: true
+
+- name: Set CPU governor to performance if supported
+  lineinfile:
+    path: /etc/default/cpufrequtils
+    regexp: '^GOVERNOR='
+    line: 'GOVERNOR="performance"'
+  when: "'available cpufreq governors' in cpupower_info.stdout and cpufreq_dir_check.rc == 0"
+  ignore_errors: true
+  register: governor_file
+
+- name: Set reboot needed fact
+  set_fact:
+    reboot_needed: true
+  when: governor_file.changed
+
+- name: Governor change status message
+  debug:
+    msg: "{{ 'Governor change performed' if reboot_needed else 'Governor change is not supported' }}"

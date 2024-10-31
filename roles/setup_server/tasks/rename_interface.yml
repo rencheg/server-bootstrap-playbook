@@ -1,0 +1,43 @@
+- name: Check if netplan is available
+  stat:
+    path: /etc/netplan
+  register: netplan_check
+  changed_when: false
+
+- name: Get the default network interface (UP and used by the default route)
+  shell: "ip route | awk '/default/ {print $5; exit}'"
+  register: default_interface_name
+  changed_when: false
+
+- name: Display network interface before change
+  include_tasks: show_interface.yml
+  vars:
+    interface_name: "{{ default_interface_name.stdout }}"
+
+- name: Check if interface is already named net0
+  command: ip link show net0
+  register: interface_check
+#  failed_when: interface_check.rc not in [0, 1]
+  changed_when: false
+  ignore_errors: true
+
+- name: Skip renaming interface if it is named net0
+  debug:
+    msg: "Interface is already named net0, skipping rename."
+  when: interface_check.rc == 0
+
+- name: Update netplan configuration to rename interface
+  replace:
+    path: /etc/netplan/50-cloud-init.yaml
+    regexp: '^( +set-name:\s+)"{{ default_interface_name.stdout }}"'
+    replace: '\1net0'
+  register: netplan_file
+
+- name: Apply netplan configuration
+  command: netplan apply
+  when: netplan_file.changed
+
+- name: Display network interface after change
+  include_tasks: show_interface.yml
+  vars:
+    interface_name: net0
